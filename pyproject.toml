@@ -1,0 +1,30 @@
+[project]
+name = "cs2skinpriceprediction"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "aiohttp>=3.13.2",
+    "beautifulsoup4>=4.14.2",
+    "blinker==1.7",
+    "cloudscraper>=1.2.71",
+    "fake-useragent>=2.2.0",
+    "google>=3.0.0",
+    "lxml>=6.0.2",
+    "matplotlib>=3.10.7",
+    "pandas>=2.3.3",
+    "protobuf>=3.20.3",
+    "psycopg2>=2.9.11",
+    "psycopg2-binary>=2.9.11",
+    "python-dotenv>=1.2.1",
+    "pytrends>=4.9.2",
+    "requests>=2.32.5",
+    "selenium>=4.32.0",
+    "selenium-wire>=5.1.0",
+    "sqlalchemy>=2.0.44",
+    "sqlalchemy-utils>=0.42.0",
+    "steam[client]>=1.4.4",
+    "undetected-chromedriver>=3.5.5",
+    "urllib3==1.26.16",
+]

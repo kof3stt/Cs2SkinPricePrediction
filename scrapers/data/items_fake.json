@@ -1,0 +1,57 @@
+{
+    "metadata": {
+        "created": "2025-11-09T13:17:02.072385",
+        "updated": "2025-11-11T13:08:24.084548",
+        "total_items": 27984,
+        "last_item_added": "2025-11-11T13:08:24.084565"
+    },
+    "items": [
+        {
+            "item_name": "Sticker | snow | Shanghai 2024",
+            "offers": 1011,
+            "trades/7d": 0,
+            "liquidity": 67.58,
+            "rank": 25543,
+            "steam_url": "https://steamcommunity.com/market/listings/730/Sticker%20%7C%20snow%20%7C%20Shanghai%202024",
+            "item_image_url": "https://cs2-cdn.pricempire.com/panorama/images/econ/stickers/sha2024/sig_snow_png.png",
+            "Variants": {
+                "Paper": 0.01,
+                "Holo": 0.65,
+                "Glitter": 0.08,
+                "Gold": 3.91
+            },
+            "Wear Range": {},
+            "Overview": {
+                "Category": "Autograph Sticker",
+                "Tournament": "Shanghai 2024",
+                "Rarity": "High Grade",
+                "Sticker Slots": "0",
+                "Team": "paiN Gaming",
+                "Price Range": "$0.01 - $46.85",
+                "Market Listings": "1011",
+                "Average Price": "$0.11",
+                "Available Variants": "4",
+                "Best Price At": "CSGOEmpire",
+                "Available On": "14 marketplaces"
+            },
+            "Price Statistics": {
+                "Current Price": 0.01,
+                "Average Price": 0.11,
+                "7 Days Low": 0.01,
+                "7 Days High": 0.03,
+                "30 Days Low": 0.01,
+                "30 Days High": 0.03,
+                "90 Days High": 0.03,
+                "Year High": 0.08
+            },
+            "Trade Statistics": {
+                "Liquidity": "68%",
+                "Rank": "25,543",
+                "Total Items": "650"
+            },
+            "pricempire_id": 25097,
+            "url": "https://pricempire.com/cs2-items/autograph-sticker/sticker-snow-shanghai-2024",
+            "collected_at": "2025-11-09T13:17:18.806607"
+        }
+    ]
+}
