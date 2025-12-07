@@ -15398,5 +15398,77 @@
     {
         "timestamp": "2025-11-01T00:00:00+00:00",
         "playerCount": 1542163
+    },
+    {
+        "timestamp": "2025-11-02T00:00:00+00:00",
+        "playerCount": 1533453
+    },
+    {
+        "timestamp": "2025-11-03T00:00:00+00:00",
+        "playerCount": 1401017
+    },
+    {
+        "timestamp": "2025-11-04T00:00:00+00:00",
+        "playerCount": 1446841
+    },
+    {
+        "timestamp": "2025-11-05T00:00:00+00:00",
+        "playerCount": 1478335
+    },
+    {
+        "timestamp": "2025-11-06T00:00:00+00:00",
+        "playerCount": 1456653
+    },
+    {
+        "timestamp": "2025-11-07T00:00:00+00:00",
+        "playerCount": 1527726
+    },
+    {
+        "timestamp": "2025-11-08T00:00:00+00:00",
+        "playerCount": 1611404
+    },
+    {
+        "timestamp": "2025-11-09T00:00:00+00:00",
+        "playerCount": 1578207
+    },
+    {
+        "timestamp": "2025-11-10T00:00:00+00:00",
+        "playerCount": 1405404
+    },
+    {
+        "timestamp": "2025-11-11T00:00:00+00:00",
+        "playerCount": 1404212
+    },
+    {
+        "timestamp": "2025-11-12T00:00:00+00:00",
+        "playerCount": 1530605
+    },
+    {
+        "timestamp": "2025-11-13T00:00:00+00:00",
+        "playerCount": 1424878
+    },
+    {
+        "timestamp": "2025-11-14T00:00:00+00:00",
+        "playerCount": 1487257
+    },
+    {
+        "timestamp": "2025-11-15T00:00:00+00:00",
+        "playerCount": 1606121
+    },
+    {
+        "timestamp": "2025-11-16T00:00:00+00:00",
+        "playerCount": 1623035
+    },
+    {
+        "timestamp": "2025-11-17T00:00:00+00:00",
+        "playerCount": 1400629
+    },
+    {
+        "timestamp": "2025-11-18T00:00:00+00:00",
+        "playerCount": 1391109
+    },
+    {
+        "timestamp": "2025-11-19T00:00:00+00:00",
+        "playerCount": 950206
     }
 ]

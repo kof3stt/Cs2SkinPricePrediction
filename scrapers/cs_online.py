@@ -46,6 +46,7 @@ class CsOnline:
         response = self.scraper.get(
             self.base_url, params=self.params, headers={"User-Agent": self.ua.random}
         )
+        print(f"url: {response.url}, status_code: {response.status_code}")
         if response.status_code == 200:
             data = response.json()["data"]
             self.df = pd.DataFrame(data)
@@ -92,5 +93,5 @@ class CsOnline:
 
 cs_online_parser = CsOnline()
 cs_online_parser.run()
-cs_online_parser.get_online_stats()
+# cs_online_parser.get_online_stats()
 cs_online_parser.plot_data()

@@ -12,3 +12,12 @@ wheels/
 pricempire_cookies.txt
 logs
 backups
+
+# Verification models
+verification_arima
+verification_lightgbm
+verification_prophet
+
+# Forecasts models
+forecasts_prophet
+forecasts_lightgbm
