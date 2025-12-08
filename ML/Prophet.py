@@ -98,7 +98,9 @@ class ProphetModel:
         end_date=None,
         limit_last_n=None,
     ):
-        df_price = self.price_history_by_id(item_id, provider, start_date, end_date, limit_last_n)
+        df_price = self.price_history_by_id(
+            item_id, provider, start_date, end_date, limit_last_n
+        )
         df_online = self.load_player_online()
 
         df_price["ds"] = pd.to_datetime(df_price["ds"]).dt.normalize()
@@ -183,14 +185,16 @@ class ProphetModel:
         os.makedirs(save_dir, exist_ok=True)
 
         df_online = self.load_player_online()
-        df_online['ds'] = pd.to_datetime(df_online['ds']).dt.tz_localize(None)
-        df_online = df_online.set_index('ds').asfreq('D').ffill().reset_index()
-        
+        df_online["ds"] = pd.to_datetime(df_online["ds"]).dt.tz_localize(None)
+        df_online = df_online.set_index("ds").asfreq("D").ffill().reset_index()
+
         online_model = Prophet(daily_seasonality=True)
-        online_model.fit(df_online[['ds', 'playerCount']].rename(columns={'playerCount':'y'}))
+        online_model.fit(
+            df_online[["ds", "playerCount"]].rename(columns={"playerCount": "y"})
+        )
         future_online = online_model.make_future_dataframe(periods=steps)
         forecast_online = online_model.predict(future_online)
-        playerCount_forecast = forecast_online[['ds','yhat']].set_index('ds')
+        playerCount_forecast = forecast_online[["ds", "yhat"]].set_index("ds")
 
         for item_id in item_ids:
             hash_name = self.get_item_name_by_id(item_id)
@@ -201,22 +205,24 @@ class ProphetModel:
                 print(f"Skipping: {hash_name}")
                 continue
 
-            df['weekday'] = df['ds'].dt.weekday
+            df["weekday"] = df["ds"].dt.weekday
 
             train_df = df.iloc[:-steps].copy()
             test_df = df.iloc[-steps:].copy()
 
             model = Prophet(daily_seasonality=True)
 
-            model.add_regressor('weekday')
+            model.add_regressor("weekday")
             model.add_regressor("playerCount")
             model.fit(train_df)
 
             future = model.make_future_dataframe(periods=steps)
 
-            future = future.set_index('ds')
-            future['playerCount'] = playerCount_forecast['yhat'].reindex(future.index).ffill()
-            future['weekday'] = future.index.weekday
+            future = future.set_index("ds")
+            future["playerCount"] = (
+                playerCount_forecast["yhat"].reindex(future.index).ffill()
+            )
+            future["weekday"] = future.index.weekday
             future = future.reset_index()
 
             forecast = model.predict(future)
@@ -271,15 +277,15 @@ class ProphetModel:
         return pd.DataFrame(results)
 
 
-prophet = ProphetModel()
-ID = 3153
-STEPS = 120
-
-hash_name = prophet.get_item_name_by_id(ID)
-
-df = prophet.price_history_with_online(ID)
-forecast = prophet.forecast_prophet_with_online(df, steps=STEPS)
-prophet.plot_forecast(df, forecast, hash_name, steps = STEPS)
+# prophet = ProphetModel()
+# ID = 3153
+# STEPS = 120
+#
+# hash_name = prophet.get_item_name_by_id(ID)
+#
+# df = prophet.price_history_with_online(ID)
+# forecast = prophet.forecast_prophet_with_online(df, steps=STEPS)
+# prophet.plot_forecast(df, forecast, hash_name, steps = STEPS)
 
 # forecast = prophet.forecast_prophet(df, steps=STEPS)
 # prophet.plot_forecast(df, forecast, hash_name, steps = STEPS)

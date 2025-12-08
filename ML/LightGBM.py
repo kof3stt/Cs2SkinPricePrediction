@@ -51,8 +51,10 @@ class LightGBMModel:
         if limit_last_n:
             sql += f" LIMIT {limit_last_n}"
 
-        df = pd.DataFrame(session.execute(text(sql), params).fetchall(),
-                          columns=["timestamp", "y", "listings"])
+        df = pd.DataFrame(
+            session.execute(text(sql), params).fetchall(),
+            columns=["timestamp", "y", "listings"],
+        )
 
         df["ds"] = pd.to_datetime(df["timestamp"]).dt.tz_localize(None)
         df = df[["ds", "y"]].sort_values("ds")
@@ -99,7 +101,7 @@ class LightGBMModel:
     # ============================
     # FEATURE GENERATOR
     # ============================
-    def make_features(self, df, lags=[1,7,14], rolling=[7,14], dropna=True):
+    def make_features(self, df, lags=[1, 7, 14], rolling=[7, 14], dropna=True):
         df = df.copy()
         df["ds"] = pd.to_datetime(df["ds"])
         df = df.sort_values("ds").reset_index(drop=True)
@@ -140,7 +142,9 @@ class LightGBMModel:
             df = df.merge(exog_online_df, on="ds", how="left", suffixes=("", "_exog"))
 
             if "playerCount_exog" in df.columns:
-                df["playerCount"] = df["playerCount_exog"].combine_first(df["playerCount"])
+                df["playerCount"] = df["playerCount_exog"].combine_first(
+                    df["playerCount"]
+                )
                 df.drop(columns=["playerCount_exog"], inplace=True)
 
         # Build historical features
@@ -164,11 +168,11 @@ class LightGBMModel:
         for i in range(len(tail), len(full)):
             full.loc[i, "weekday"] = full.loc[i, "ds"].weekday()
 
-            for L in [1,7,14]:
+            for L in [1, 7, 14]:
                 full.loc[i, f"lag{L}"] = full.loc[i - L, "y"]
 
-            for W in [7,14]:
-                window = full.loc[i - W:i, "y"]
+            for W in [7, 14]:
+                window = full.loc[i - W : i, "y"]
                 full.loc[i, f"ma{W}"] = window.mean()
                 full.loc[i, f"std{W}"] = window.std()
 
@@ -184,8 +188,7 @@ class LightGBMModel:
     def get_item_name_by_id(self, item_id):
         session = create_session()
         row = session.execute(
-            text("SELECT hash_name FROM items WHERE item_id=:id"),
-            {"id": item_id}
+            text("SELECT hash_name FROM items WHERE item_id=:id"), {"id": item_id}
         ).fetchone()
         return row[0] if row else f"item_{item_id}"
 
@@ -225,13 +228,15 @@ class LightGBMModel:
             rmse = root_mean_squared_error(y_true, y_pred)
             mape = np.mean(np.abs((y_true - y_pred) / y_true)) * 100
 
-            results.append({
-                "item_id": item_id,
-                "item_name": hash_name,
-                "MAE": mae,
-                "RMSE": rmse,
-                "MAPE (%)": mape,
-            })
+            results.append(
+                {
+                    "item_id": item_id,
+                    "item_name": hash_name,
+                    "MAE": mae,
+                    "RMSE": rmse,
+                    "MAPE (%)": mape,
+                }
+            )
 
             plt.figure(figsize=(12, 5))
 
@@ -259,10 +264,12 @@ class LightGBMModel:
                 )
             plt.close()
 
-            print(f"Verified {item_id}, {hash_name} — MAE={mae:.3f}, RMSE={rmse:.3f}, MAPE={mape:.2f}%")
+            print(
+                f"Verified {item_id}, {hash_name} — MAE={mae:.3f}, RMSE={rmse:.3f}, MAPE={mape:.2f}%"
+            )
 
         return pd.DataFrame(results)
-    
+
     def plot_forecast(self, df, forecast, hash_name, steps, min_date=None, save=True):
         """
         df — исторический DataFrame ['ds', 'y', 'playerCount']
@@ -280,19 +287,11 @@ class LightGBMModel:
         plt.figure(figsize=(12, 6))
 
         # История
-        plt.plot(
-            df_plot["ds"],
-            df_plot["y"],
-            alpha=0.6,
-            label="Historical Price"
-        )
+        plt.plot(df_plot["ds"], df_plot["y"], alpha=0.6, label="Historical Price")
 
         # Прогноз
         plt.plot(
-            forecast_plot["ds"],
-            forecast_plot["yhat"],
-            linewidth=1,
-            label="Forecast"
+            forecast_plot["ds"], forecast_plot["yhat"], linewidth=1, label="Forecast"
         )
 
         # plt.fill_between(
@@ -322,7 +321,7 @@ class LightGBMModel:
 
         plt.show()
 
-    def make_features_online(self, df, lags=[1,7,14], rolling=[7,14], dropna=True):
+    def make_features_online(self, df, lags=[1, 7, 14], rolling=[7, 14], dropna=True):
         df = df.copy()
         df["ds"] = pd.to_datetime(df["ds"])
         df = df.sort_values("ds").reset_index(drop=True)
@@ -343,7 +342,7 @@ class LightGBMModel:
         FEATURES += [f"std{W}" for W in rolling]
 
         return df, FEATURES
-    
+
     def forecast_online(self, steps=120):
         # Load data
         df_online = self.load_player_online()
@@ -359,15 +358,11 @@ class LightGBMModel:
             weekly_seasonality=True,
             yearly_seasonality=True,
             interval_width=0.8,
-            seasonality_mode="multiplicative",   # online often multiplicative
+            seasonality_mode="multiplicative",  # online often multiplicative
         )
 
         # Add extra seasonalities if needed
-        model.add_seasonality(
-            name="monthly",
-            period=30.5,
-            fourier_order=6
-        )
+        model.add_seasonality(name="monthly", period=30.5, fourier_order=6)
 
         # Fit
         model.fit(df_prophet)
@@ -388,13 +383,13 @@ class LightGBMModel:
 # ============================
 # USAGE
 # ============================
-light_gbm_model = LightGBMModel()
+# light_gbm_model = LightGBMModel()
 
-ids_to_verify = [25355, 25395, 3153, 26954, 19010, 6317, 25201, 11773, 19356]
-ids_to_verify = range(1, 30000)
+# ids_to_verify = [25355, 25395, 3153, 26954, 19010, 6317, 25201, 11773, 19356]
+# ids_to_verify = range(1, 30000)
 
-results = light_gbm_model.verify_model(ids_to_verify, steps=30, min_date_to_plot="2024-01-01")
-results.to_csv("verification_lightgbm/metrics.csv", index=False)
+# results = light_gbm_model.verify_model(ids_to_verify, steps=30, min_date_to_plot="2024-01-01")
+# results.to_csv("verification_lightgbm/metrics.csv", index=False)
 
 
 # TEST
