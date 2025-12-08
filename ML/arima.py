@@ -14,11 +14,13 @@ from database import create_session
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from pmdarima import auto_arima
+from prophet import Prophet
 
 
 class Arima:
     def __init__(self):
-        pass
+        self._online_model = None
+        self._online_forecast_cache = {}
 
     def price_history_by_id(
         self,
@@ -31,7 +33,7 @@ class Arima:
         session = create_session()
 
         sql = """
-            SELECT timestamp, price, listings
+            SELECT timestamp, price
             FROM price_time_series
             WHERE item_id = :item_id
               AND provider = :provider
@@ -62,13 +64,9 @@ class Arima:
         df = df.sort_values("timestamp")
         df = df.set_index("timestamp")
 
-        df = df.asfreq("D")
         df["price"] = pd.to_numeric(df["price"], errors="coerce")
-        df["listings"] = pd.to_numeric(df["listings"], errors="coerce")
 
-        df = df.interpolate()
-
-        df["listings"] = df["listings"].astype(int)
+        df = df.resample("D").ffill()
 
         return df
 
@@ -98,7 +96,7 @@ class Arima:
         model = SARIMAX(
             y,
             order=(3, 1, 1),  # (1, 1, 2)
-            seasonal_order=(1, 0, 0, 30),
+            seasonal_order=(0, 0, 0, 0),
             enforce_stationarity=False,
             enforce_invertibility=False,
         )
@@ -156,57 +154,111 @@ class Arima:
         steps=30,
         order=(3, 1, 1),
         seasonal_order=(1, 0, 0, 30),
-        exog_columns=["listings"],
+        exog_columns=[],
         player_json_path="scrapers/cs_online.json",
     ):
+        """
+        Прогнозирование с использованием модели SARIMAX с экзогенными переменными.
+        Включает улучшенный прогноз онлайн-игроков с помощью модели Prophet.
+        """
         # Нормализуем временные метки до даты
         df_norm = df.copy()
         df_norm.index = df_norm.index.normalize()
-        exog = df_norm[exog_columns].copy()
-
-        # Загружаем данные по онлайн игрокам
+        
+        # Создаем DataFrame с экзогенными переменными (без playerCount)
+        exog = df_norm[exog_columns].copy() if exog_columns else pd.DataFrame(index=df_norm.index)
+        
+        # Загружаем и подготавливаем исторические данные по онлайн-игрокам
         with open(player_json_path, "r", encoding="utf-8") as f:
             player_data = json.load(f)
         player_df = pd.DataFrame(player_data)
         player_df["timestamp"] = pd.to_datetime(player_df["timestamp"]).dt.normalize()
         player_df = player_df.set_index("timestamp")
-
-        # Объединяем exog с playerCount
+        
+        # Объединяем экзогенные переменные с историческими данными об онлайн-игроках
         exog = exog.join(player_df, how="left")
-
-        # Заполняем пропуски и приводим к целым числам
+        
+        # Заполняем пропуски и приводим типы данных
         exog = exog.ffill().bfill()
-        exog["playerCount"] = exog["playerCount"].astype(int)
-
+        if "playerCount" in exog.columns:
+            exog["playerCount"] = exog["playerCount"].astype(int)
+        
+        # Целевая переменная - цена
         y = df_norm["price"].copy()
-
-        # Создаем SARIMAX модель с экзогенными переменными
+        
+        # Убеждаемся, что индексы y и exog совпадают
+        exog = exog.reindex(y.index)
+        exog = exog.ffill().bfill()
+        
+        # Строим прогноз онлайн-игроков на период steps
+        online_forecast = self.forecast_online(steps)
+        
+        # Создаем DataFrame для будущих экзогенных переменных
+        future_index = pd.date_range(
+            start=y.index[-1] + pd.Timedelta(days=1), 
+            periods=steps, 
+            freq="D"
+        )
+        
+        # Создаем exog_future с прогнозируемыми значениями
+        exog_future_list = []
+        
+        for i in range(steps):
+            future_row = {}
+            
+            # Для каждой экзогенной переменной (кроме playerCount) используем последнее известное значение
+            for col in exog_columns:
+                if col in exog.columns:
+                    future_row[col] = exog[col].iloc[-1]
+            
+            # Добавляем прогнозируемое значение онлайн-игроков
+            if i < len(online_forecast):
+                future_row["playerCount"] = online_forecast.iloc[i]["playerCount"]
+            else:
+                # Если прогноз недостаточно длинный, используем последнее прогнозируемое значение
+                future_row["playerCount"] = online_forecast.iloc[-1]["playerCount"]
+            
+            exog_future_list.append(future_row)
+        
+        exog_future = pd.DataFrame(exog_future_list, index=future_index)
+        
+        # Убеждаемся, что порядок столбцов совпадает с exog
+        if "playerCount" in exog.columns and "playerCount" not in exog_future.columns:
+            exog_future["playerCount"] = online_forecast["playerCount"].values[:steps]
+        
+        # Сортируем столбцы в том же порядке, что и в exog
+        exog_future = exog_future[exog.columns]
+        
+        # Создаем и обучаем модель SARIMAX с экзогенными переменными
         model = SARIMAX(
             y,
             order=order,
             seasonal_order=seasonal_order,
             exog=exog,
-            enforce_stationarity=False,
-            enforce_invertibility=False,
+            trend="t"
         )
-        model_fit = model.fit(disp=False)
-
-        # Берем последнюю строку exog для будущих значений
-        last_exog = exog.iloc[-1:]
-        future_index = pd.date_range(
-            start=y.index[-1] + pd.Timedelta(days=1), periods=steps, freq="D"
-        )
-        exog_future = pd.DataFrame(
-            np.tile(last_exog.values, (steps, 1)),
-            index=future_index,
-            columns=exog.columns,
-        )
-
-        # Делаем прогноз
+        
+        try:
+            model_fit = model.fit(disp=False, maxiter=1000)
+        except Exception as e:
+            print(f"Ошибка при обучении модели SARIMAX: {e}")
+            # Пробуем упрощенную модель в случае ошибки
+            model = SARIMAX(
+                y,
+                order=(1, 1, 0),
+                seasonal_order=(0, 0, 0, 0),
+                exog=exog,
+                enforce_stationarity=False,
+                enforce_invertibility=False,
+            )
+            model_fit = model.fit(disp=False)
+        
+        # Делаем прогноз с использованием будущих экзогенных переменных
         pred = model_fit.get_forecast(steps=steps, exog=exog_future)
         forecast_values = pred.predicted_mean
         conf_int = pred.conf_int()
-
+        
+        # Формируем результат
         result = pd.DataFrame(
             {
                 "forecast": forecast_values,
@@ -215,7 +267,10 @@ class Arima:
             },
             index=future_index,
         )
-
+        
+        # Дополнительно: сохраняем использованные экзогенные переменные для анализа
+        result["playerCount"] = exog_future["playerCount"].values
+        
         return result
 
     def plot_forecast(self, item_id, df, forecast, min_date=None, save=True):
@@ -270,7 +325,7 @@ class Arima:
         plt.close()
 
     def verify_model(
-        self, item_ids, steps=30, exog_columns=["listings"], min_date_to_plot=None
+        self, item_ids, steps=30, exog_columns=[], min_date_to_plot=None
     ):
         """
         Верификация модели для списка предметов.
@@ -289,6 +344,9 @@ class Arima:
 
             df = self.price_history_by_id(item_id, end_date="2025-09-01")
 
+            if df.empty:
+                continue
+
             train = df.iloc[:-steps].copy()
             test = df.iloc[-steps:].copy()
 
@@ -297,7 +355,7 @@ class Arima:
             )
             # forecast = self.forecast_sarimax(train, steps=30)
 
-            test.index = test.index - pd.Timedelta(hours=3)
+            test.index = test.index.normalize()
 
             forecast = forecast.reindex(test.index)
 
@@ -319,7 +377,7 @@ class Arima:
             )
 
             print(
-                f"Verified {item_id} — MAE: {mae:.3f}, RMSE: {rmse:.3f}, MAPE: {mape:.2f}%"
+                f"Verified {item_id}, {hash_name} — MAE: {mae:.3f}, RMSE: {rmse:.3f}, MAPE: {mape:.2f}%"
             )
 
             if min_date_to_plot:
@@ -348,16 +406,62 @@ class Arima:
                 alpha=0.2,
                 label="Confidence Interval",
             )
-            plt.title(f"Forecast vs Real — {hash_name}")
+            plt.title(f"SARIMAX: Forecast vs Real — {hash_name}")
             plt.xlabel("Date")
             plt.ylabel("Price")
             plt.legend()
             plt.grid(True)
 
-            filename = f"{save_dir}/{re.sub(r'[<>:"/\\|?*]', '_', hash_name)}.png"
-            plt.savefig(filename, bbox_inches="tight")
+            filename = f"{save_dir}/item{item_id}_{re.sub(r'[<>:\"/\\\\|?*]', '_', hash_name)}.png"
+            if mape < 5:
+                plt.savefig(filename)
+            plt.show()
 
         return pd.DataFrame(results)
+    
+    def forecast_online(self, steps=120):
+        if steps in self._online_forecast_cache:
+            return self._online_forecast_cache[steps]
+
+        model = self.load_or_fit_online_model()
+        future = model.make_future_dataframe(periods=steps)
+        forecast = model.predict(future)[["ds", "yhat"]].tail(steps)
+        forecast = forecast.rename(columns={"yhat": "playerCount"})
+
+        self._online_forecast_cache[steps] = forecast
+        return forecast
+    
+    def load_player_online(self, json_path="scrapers/cs_online.json"):
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        df = pd.DataFrame(data)
+        df["ds"] = pd.to_datetime(df["timestamp"]).dt.tz_localize(None).dt.normalize()
+        df = df[["ds", "playerCount"]]
+
+        # Daily freq
+        df = df.set_index("ds").asfreq("D").ffill().reset_index()
+
+        return df
+    
+    def load_or_fit_online_model(self):
+        if self._online_model is not None:
+            return self._online_model
+
+        df_online = self.load_player_online()
+        df_prophet = df_online.rename(columns={"playerCount": "y"}).copy()
+
+        model = Prophet(
+            daily_seasonality=False,
+            weekly_seasonality=True,
+            yearly_seasonality=True,
+            seasonality_mode="multiplicative",
+        )
+        model.add_seasonality(name="monthly", period=30.5, fourier_order=6)
+
+        model.fit(df_prophet)
+        self._online_model = model
+        return model
 
 
 # arima = Arima()
@@ -372,5 +476,6 @@ class Arima:
 # arima.plot_forecast(item_id, df, forecast, min_date="2025-08-18")
 
 # ids_to_verify = [25355, 25395, 3153, 26954, 19010, 6317, 25201, 11773, 19356]
+# ids_to_verify = [23482]
 # results = arima.verify_model(ids_to_verify, steps=30, min_date_to_plot='2024-01-01')
-# results.to_csv("forecasts_arima/metrics.csv", index=False, float_format='%.2f')
+# results.to_csv("verification_arima/metrics.csv", index=False, float_format='%.2f')

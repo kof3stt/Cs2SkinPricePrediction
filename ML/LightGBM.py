@@ -262,6 +262,7 @@ class LightGBMModel:
                 plt.savefig(
                     f"{save_dir}/item{item_id}_{re.sub(r'[<>:\"/\\\\|?*]', '_', hash_name)}.png"
                 )
+            plt.show()
             plt.close()
 
             print(
@@ -385,7 +386,7 @@ class LightGBMModel:
 # ============================
 # light_gbm_model = LightGBMModel()
 
-# ids_to_verify = [25355, 25395, 3153, 26954, 19010, 6317, 25201, 11773, 19356]
+# ids_to_verify = [23482]
 # ids_to_verify = range(1, 30000)
 
 # results = light_gbm_model.verify_model(ids_to_verify, steps=30, min_date_to_plot="2024-01-01")

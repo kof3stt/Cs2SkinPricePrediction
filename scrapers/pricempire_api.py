@@ -167,3 +167,4 @@ class PriceEmpireAPI:
 if __name__ == "__main__":
     api = PriceEmpireAPI("data/items_data.json", cookies_file="pricempire_cookies.txt")
     api.parse()
+    # data = api.get_item_price(10)

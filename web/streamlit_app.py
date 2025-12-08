@@ -1,6 +1,8 @@
 import re
+import sys
+import os
 from functools import lru_cache
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 import altair as alt
 import pandas as pd
@@ -8,6 +10,7 @@ import streamlit as st
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import Item, create_session
 from ML.LightGBM import LightGBMModel
 from ML.Prophet import ProphetModel
@@ -154,15 +157,43 @@ def plot_forecast(history: pd.DataFrame, forecast: pd.DataFrame, title: str):
             color="type:N",
             tooltip=["ds:T", "value:Q", "type:N"],
         )
-        .properties(height=360, title=title)
+        .properties(
+            height=360,
+            title=alt.TitleParams(text=title, anchor="middle"),
+        )
+        .interactive()
     )
-    st.altair_chart(chart, use_container_width=True)
+    st.altair_chart(chart, width="stretch")
 
 
-def plot_validation(eval_df: pd.DataFrame, title: str):
+def plot_validation_with_history(
+    history: pd.DataFrame,
+    eval_df: pd.DataFrame,
+    title: str,
+    min_date: Optional[pd.Timestamp] = None,
+):
+    """Похожий график на LightGBM verify: train, test (истина) и прогноз."""
+    history_sorted = history.sort_values("ds")
+    cutoff = eval_df["ds"].min()
+    train_df = history_sorted[history_sorted["ds"] < cutoff].copy()
+
+    train_df = train_df.rename(columns={"y": "value"})
+    train_df["label"] = "Train"
+
+    test_true = eval_df[["ds", "y_true"]].rename(columns={"y_true": "value"})
+    test_true["label"] = "Test (real)"
+
+    test_pred = eval_df[["ds", "y_pred"]].rename(columns={"y_pred": "value"})
+    test_pred["label"] = "Forecast"
+
+    combined = pd.concat([train_df, test_true, test_pred], ignore_index=True)
+    combined["ds"] = pd.to_datetime(combined["ds"])
+
+    if min_date is not None:
+        combined = combined[combined["ds"] >= min_date]
+
     chart = (
-        alt.Chart(eval_df)
-        .transform_fold(["y_true", "y_pred"], as_=["label", "value"])
+        alt.Chart(combined)
         .mark_line()
         .encode(
             x="ds:T",
@@ -170,9 +201,13 @@ def plot_validation(eval_df: pd.DataFrame, title: str):
             color="label:N",
             tooltip=["ds:T", "value:Q", "label:N"],
         )
-        .properties(height=320, title=title)
+        .properties(
+            height=340,
+            title=alt.TitleParams(text=title, anchor="middle"),
+        )
+        .interactive()  # пан/зум, hover работает из коробки
     )
-    st.altair_chart(chart, use_container_width=True)
+    st.altair_chart(chart, width="stretch")
 
 
 # ----------------------------------------
@@ -202,6 +237,11 @@ with st.sidebar:
     )
     steps = st.slider("Горизонт прогноза (дней)", 7, 120, 30, 1)
     do_validation = st.checkbox("Выполнить валидацию (последние N точек)", value=False)
+    min_date_str = st.text_input(
+        "Мин. дата для графика валидации (YYYY-MM-DD)",
+        value="",
+        placeholder="2024-01-01",
+    )
 
     st.markdown("---")
     st.markdown("Чтобы запустить: `streamlit run streamlit_app.py`")
@@ -236,22 +276,71 @@ def display_item_meta(item_id: int):
     if not meta:
         st.warning("Метаданные не найдены в базе.")
         return
-    st.markdown(f"**Hash name:** {meta.get('hash_name')}")
-    st.markdown(f"**Item ID:** {meta.get('item_id')}")
+    # Card styling to ensure readable text (no white-on-white)
     st.markdown(
-        f"**Категория:** {meta.get('category') or '—'} | "
-        f"Оружие: {meta.get('weapon') or '—'} | "
-        f"Редкость: {meta.get('rarity') or '—'}"
+        """
+        <style>
+        .item-card {
+            border: 1px solid #d9e2ec;
+            border-radius: 14px;
+            padding: 16px;
+            background: linear-gradient(135deg, #f7f9fc 0%, #edf2fb 100%);
+            color: #111827;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+        }
+        .item-card h3 {
+            margin: 0 0 8px 0;
+            color: #0f172a;
+        }
+        .item-card p {
+            margin: 4px 0;
+            color: #111827;
+            line-height: 1.45;
+        }
+        .item-meta-label {
+            font-weight: 700;
+            color: #0f172a;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
     )
-    links = []
-    if meta.get("steam_url"):
-        links.append(f"[Steam]({meta['steam_url']})")
-    if meta.get("pricempire_url"):
-        links.append(f"[PriceEmpire]({meta['pricempire_url']})")
-    if links:
-        st.markdown("Ссылки: " + " • ".join(links))
-    if meta.get("item_image_url"):
-        st.image(meta["item_image_url"], width=200)
+
+    cols = st.columns([1, 2])
+    with cols[0]:
+        if meta.get("item_image_url"):
+            st.image(meta["item_image_url"], width=200)
+    with cols[1]:
+        link_parts = []
+        if meta.get("steam_url"):
+            link_parts.append(
+                f'<a href="{meta["steam_url"]}" target="_blank">Steam</a>'
+            )
+        if meta.get("pricempire_url"):
+            link_parts.append(
+                f'<a href="{meta["pricempire_url"]}" target="_blank">PriceEmpire</a>'
+            )
+        links_html = " • ".join(link_parts) if link_parts else "—"
+
+        st.markdown(
+            f"""
+            <div class="item-card">
+                <h3>{meta.get('hash_name', '—')}</h3>
+                <p><span class="item-meta-label">ID:</span> {meta.get('item_id')}</p>
+                <p>
+                    <span class="item-meta-label">Категория:</span> {meta.get('category') or '—'}<br/>
+                    <span class="item-meta-label">Оружие:</span> {meta.get('weapon') or '—'}<br/>
+                    <span class="item-meta-label">Редкость:</span> {meta.get('rarity') or '—'}
+                </p>
+                <p>
+                    <span class="item-meta-label">Коллекция:</span> {meta.get('collection') or '—'}<br/>
+                    <span class="item-meta-label">Финиш:</span> {meta.get('finish') or '—'}
+                </p>
+                <p><span class="item-meta-label">Ссылки:</span> {links_html}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 def run_model_and_plot(item_id: int, model_name: str, steps: int):
@@ -301,7 +390,18 @@ if run_forecast and selected_item_id:
                 else:
                     metrics, eval_df = evaluate_prophet(selected_item_id, steps)
                 st.write(metrics)
-                plot_validation(eval_df, "Прогноз vs Истина")
+                min_date = None
+                if min_date_str:
+                    try:
+                        min_date = pd.to_datetime(min_date_str)
+                    except Exception:
+                        st.warning("Не удалось разобрать дату. Использую все точки.")
+                plot_validation_with_history(
+                    history[["ds", "y"]],
+                    eval_df,
+                    "Прогноз vs Истина",
+                    min_date=min_date,
+                )
             except Exception as exc:
                 st.warning(f"Не удалось выполнить валидацию: {exc}")
 

@@ -258,7 +258,7 @@ class ProphetModel:
             plt.plot(test_df["ds"], y_pred, label="Forecast", linewidth=2)
 
             plt.title(
-                f"Forecast vs Real — {re.sub(r'([$#%&{}_])', r'\\\1', hash_name)}"
+                f"Prophet: Forecast vs Real — {re.sub(r'([$#%&{}_])', r'\\\1', hash_name)}"
             )
             plt.legend()
             plt.grid(True)
@@ -268,6 +268,7 @@ class ProphetModel:
                 plt.savefig(
                     f"{save_dir}/item{item_id}_{re.sub(r'[<>:\"/\\\\|?*]', '_', hash_name)}.png"
                 )
+            plt.show()
             plt.close()
 
             print(
@@ -291,7 +292,7 @@ class ProphetModel:
 # prophet.plot_forecast(df, forecast, hash_name, steps = STEPS)
 
 # verif
-# ids_to_verify = [25355, 25395, 3153, 26954, 19010, 6317, 25201, 11773, 19356]
+# ids_to_verify = [23482]
 # ids_to_verify = range(9184, 30000)
 # results = prophet.verify_model(ids_to_verify, steps=30, min_date_to_plot="2024-01-01")
 # results.to_csv("verification_prophet/metrics.csv", index=False, float_format="%.2f")
